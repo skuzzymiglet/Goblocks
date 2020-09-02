@@ -3,13 +3,13 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"goblocks/util"
 	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
-
-	"github.com/skuzzymiglet/Goblocks/util"
 )
 
 type configStruct struct {
@@ -23,7 +23,11 @@ var channels []chan bool
 var signalMap map[string]int = make(map[string]int)
 
 func main() {
-	config, err := readConfig(os.Getenv("HOME") + "/.config/goblocks.json")
+	confDir, err := os.UserConfigDir()
+	if err != nil {
+		log.Fatal(err)
+	}
+	config, err := readConfig(filepath.Join(confDir, "goblocks.json"))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -39,7 +43,7 @@ func main() {
 			blocks = append(blocks, value.(string))
 		}
 		blocks = append(blocks, "action")
-		actionId := len(blocks) - 1
+		actionID := len(blocks) - 1
 		if value, ok := action["suffix"]; ok {
 			blocks = append(blocks, value.(string))
 		}
@@ -56,13 +60,13 @@ func main() {
 	for res := range recChannel {
 		//Block until some goroutine has an update
 		if res.Success {
-			blocks[res.BlockId] = res.Data
+			blocks[res.BlockID] = res.Data
 		} else {
 			fmt.Println(res.Data)
-			blocks[res.BlockId] = "ERROR"
+			blocks[res.BlockID] = "ERROR"
 		}
 		if err = updateStatusBar(); err != nil {
-			fmt.Fprintf(os.Stderr, "failed to update status bar: %s\n", err)
+			log.Fatalf("failed to update status bar: %s\n", err)
 		}
 	}
 }
@@ -72,12 +76,14 @@ func readConfig(path string) (config configStruct, err error) {
 	var file *os.File
 	file, err = os.Open(path)
 	defer file.Close()
-	if err == nil {
-		var byteValue []byte
-		byteValue, err = ioutil.ReadAll(file)
-		if err == nil {
-			err = json.Unmarshal([]byte(byteValue), &config)
-		}
+	if err != nil {
+		return config, err
+	}
+	var byteValue []byte
+	byteValue, err = ioutil.ReadAll(file)
+	err = json.Unmarshal([]byte(byteValue), &config)
+	if err != nil {
+		return config, err
 	}
 	return config, err
 }
