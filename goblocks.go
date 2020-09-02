@@ -46,11 +46,7 @@ func main() {
 		//Create an unique channel for each action
 		channels[i] = make(chan bool)
 		signalMap["signal "+action["updateSignal"].(string)] = i
-		if (action["command"].(string))[0] == '#' {
-			go util.FunctionMap[action["command"].(string)](actionId, recChannel, channels[i], action)
-		} else {
-			go util.RunCmd(actionId, recChannel, channels[i], action)
-		}
+		go util.RunCmd(actionID, recChannel, channels[i], action)
 		timer := action["timer"].(string)
 		if timer != "0" {
 			go util.Schedule(channels[i], timer)
