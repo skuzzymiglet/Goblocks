@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 type configStruct struct {
@@ -57,6 +58,8 @@ func main() {
 		}
 	}
 	go handleSignals(util.GetSIGRTchannel())
+	var updates float64
+	start := time.Now()
 	for res := range recChannel {
 		//Block until some goroutine has an update
 		if res.Success {
@@ -67,6 +70,12 @@ func main() {
 		}
 		if err = updateStatusBar(); err != nil {
 			log.Fatalf("failed to update status bar: %s\n", err)
+		}
+		updates++
+		perSec := updates / float64(time.Now().Sub(start)) * float64(time.Second)
+		// log.Printf("%f updates per second", perSec)
+		if perSec >= 20 && !(updates == 100) {
+			log.Printf("Too many updates (%f) exiting to avoid crash", perSec)
 		}
 	}
 }
@@ -103,7 +112,7 @@ func updateStatusBar() error {
 	for _, s := range blocks {
 		builder.WriteString(s)
 	}
-	//	fmt.Println(builder.String())
+	// log.Println(builder.String())
 	//	set dwm status text
 	return exec.Command("xsetroot", "-name", builder.String()).Run()
 }
