@@ -3,15 +3,14 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"goblocks/util"
 	"io/ioutil"
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
-
-	"github.com/BurntSushi/xgb"
-	"github.com/BurntSushi/xgb/xproto"
 )
 
 type configStruct struct {
@@ -35,7 +34,7 @@ func main() {
 	}
 	channels = make([]chan bool, len(config.Actions))
 	//recChannel is common for goroutines contributing to status bar
-	recChannel := make(chan Change)
+	recChannel := make(chan util.Change)
 	for i, action := range config.Actions {
 		//Assign a cell for each separator/prefix/action/suffix
 		if config.Separator != "" {
@@ -52,13 +51,13 @@ func main() {
 		//Create an unique channel for each action
 		channels[i] = make(chan bool)
 		signalMap["signal "+action["updateSignal"].(string)] = i
-		go RunCmd(actionID, recChannel, channels[i], action)
+		go util.RunCmd(actionID, recChannel, channels[i], action)
 		timer := action["timer"].(string)
 		if timer != "0" {
-			go Schedule(channels[i], timer)
+			go util.Schedule(channels[i], timer)
 		}
 	}
-	go handleSignals(GetSIGRTchannel())
+	go handleSignals(util.GetSIGRTchannel())
 	var updates float64
 	start := time.Now()
 	for res := range recChannel {
@@ -94,8 +93,8 @@ func readConfig(path string) (config configStruct, err error) {
 	err = json.Unmarshal([]byte(byteValue), &config)
 	if err != nil {
 		return config, err
-
 	}
+	return config, err
 }
 
 //Goroutine that pings a channel according to received signal
@@ -108,10 +107,12 @@ func handleSignals(rec chan os.Signal) {
 }
 
 //Craft status text out of blocks data
-func updateBar(conn *xgb.Conn, rootWindow xproto.Window) {
+func updateStatusBar() error {
 	var builder strings.Builder
 	for _, s := range blocks {
 		builder.WriteString(s)
 	}
-	xproto.ChangeProperty(conn, xproto.PropModeReplace, rootWindow, xproto.AtomWmName, xproto.AtomString, 8, uint32(builder.Len()), []byte(builder.String()))
+	// log.Println(builder.String())
+	//	set dwm status text
+	return exec.Command("xsetroot", "-name", builder.String()).Run()
 }
